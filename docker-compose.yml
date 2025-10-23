@@ -225,6 +225,56 @@ services:
       start_period: 40s
     restart: unless-stopped
 
+  # User Service - User Profile Management
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: adventure-user-service
+    environment:
+      NODE_ENV: development
+      USER_SERVICE_PORT: 3003
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: adventure_user
+      POSTGRES_PASSWORD: adventure_pass
+      POSTGRES_DB: adventure_platform
+      POSTGRES_SSL: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 1
+      JWT_ACCESS_SECRET: dev-access-secret-change-in-production
+      AUTH_SERVICE_URL: http://auth-service:3001
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: adventure_user
+      MINIO_SECRET_KEY: adventure_pass
+      MINIO_BUCKET: user-avatars
+      MAX_FILE_SIZE: 5242880
+      AVATAR_SIZE_SMALL: 50
+      AVATAR_SIZE_MEDIUM: 200
+      AVATAR_SIZE_LARGE: 400
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3003/api/v1/profiles/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
