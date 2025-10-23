@@ -1,0 +1,175 @@
+# Prometheus Configuration for Adventure Management Platform
+# Scrapes metrics from all microservices and infrastructure
+
+global:
+  scrape_interval: 15s # Scrape targets every 15 seconds
+  evaluation_interval: 15s # Evaluate rules every 15 seconds
+  external_labels:
+    cluster: 'adventure-platform-dev'
+    environment: 'development'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # API Gateway
+  - job_name: 'api-gateway'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['api-gateway:3000']
+        labels:
+          service: 'api-gateway'
+          tier: 'gateway'
+
+  # Auth Service
+  - job_name: 'auth-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['auth-service:3001']
+        labels:
+          service: 'auth-service'
+          tier: 'core'
+
+  # User Service
+  - job_name: 'user-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['user-service:3002']
+        labels:
+          service: 'user-service'
+          tier: 'core'
+
+  # Quest Service
+  - job_name: 'quest-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['quest-service:3003']
+        labels:
+          service: 'quest-service'
+          tier: 'feature'
+
+  # Geospatial Service
+  - job_name: 'geospatial-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['geospatial-service:3004']
+        labels:
+          service: 'geospatial-service'
+          tier: 'feature'
+
+  # Gamification Service
+  - job_name: 'gamification-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['gamification-service:3005']
+        labels:
+          service: 'gamification-service'
+          tier: 'feature'
+
+  # Social Service
+  - job_name: 'social-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['social-service:3006']
+        labels:
+          service: 'social-service'
+          tier: 'feature'
+
+  # Creator Service
+  - job_name: 'creator-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['creator-service:3007']
+        labels:
+          service: 'creator-service'
+          tier: 'feature'
+
+  # Streaming Service
+  - job_name: 'streaming-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['streaming-service:3008']
+        labels:
+          service: 'streaming-service'
+          tier: 'feature'
+
+  # Notification Service
+  - job_name: 'notification-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['notification-service:3009']
+        labels:
+          service: 'notification-service'
+          tier: 'core'
+
+  # PostgreSQL Exporter
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgresql'
+          tier: 'data'
+
+  # Redis Exporter
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          tier: 'data'
+
+  # MongoDB Exporter
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['mongodb-exporter:9216']
+        labels:
+          service: 'mongodb'
+          tier: 'data'
+
+  # Elasticsearch Exporter
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch-exporter:9114']
+        labels:
+          service: 'elasticsearch'
+          tier: 'data'
+
+  # RabbitMQ
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+        labels:
+          service: 'rabbitmq'
+          tier: 'messaging'
+
+  # Node Exporter (for host metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+          tier: 'infrastructure'
+
+  # cAdvisor (container metrics)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+          tier: 'infrastructure'

@@ -1,0 +1,285 @@
+@startuml Adventure Management Platform - Component Diagram
+
+!define RECTANGLE
+skinparam component {
+    BackgroundColor<<service>> LightBlue
+    BackgroundColor<<database>> LightYellow
+    BackgroundColor<<external>> LightGreen
+}
+
+title Adventure Management Platform - Component Architecture
+
+' Client Applications
+package "Client Layer" {
+    [Web Application\n(React)] as WebApp
+    [Mobile App\n(React Native)] as MobileApp
+    [Admin Dashboard\n(React)] as AdminApp
+}
+
+' API Gateway
+package "Gateway Layer" {
+    component [API Gateway] <<service>> as Gateway {
+        portin " " as gw_in
+        portout " " as gw_out
+    }
+
+    note right of Gateway
+        **Responsibilities:**
+        - Request routing
+        - Authentication
+        - Rate limiting
+        - API versioning
+        - Response caching
+    end note
+}
+
+' Core Services
+package "Core Services" {
+
+    component [Auth Service] <<service>> as AuthSvc {
+        portin " " as auth_in
+        database " " as auth_db
+
+        [JWT Manager]
+        [OAuth Handler]
+        [Session Manager]
+        [2FA Module]
+    }
+
+    component [User Service] <<service>> as UserSvc {
+        portin " " as user_in
+        database " " as user_db
+
+        [Profile Manager]
+        [Preferences Handler]
+        [Avatar Manager]
+    }
+
+    component [Notification Service] <<service>> as NotifySvc {
+        portin " " as notify_in
+        database " " as notify_db
+
+        [Push Handler]
+        [Email Handler]
+        [SMS Handler]
+        [In-App Handler]
+    }
+}
+
+' Feature Services
+package "Feature Services" {
+
+    component [Quest Service] <<service>> as QuestSvc {
+        portin " " as quest_in
+        database " " as quest_db
+
+        [Quest Manager]
+        [Checkpoint Handler]
+        [Participation Tracker]
+        [AI Generator]
+    }
+
+    component [Geospatial Service] <<service>> as GeoSvc {
+        portin " " as geo_in
+        database " " as geo_db
+
+        [GPS Validator]
+        [Route Planner]
+        [POI Manager]
+        [Geofence Handler]
+    }
+
+    component [Gamification Service] <<service>> as GameSvc {
+        portin " " as game_in
+        database " " as game_db
+
+        [XP Manager]
+        [Achievement Engine]
+        [Leaderboard Handler]
+        [Reward Distributor]
+    }
+
+    component [Social Service] <<service>> as SocialSvc {
+        portin " " as social_in
+        database " " as social_db
+
+        [Friend Manager]
+        [Team Manager]
+        [Message Handler]
+        [Activity Feed]
+    }
+
+    component [Creator Service] <<service>> as CreatorSvc {
+        portin " " as creator_in
+        database " " as creator_db
+
+        [Subscription Manager]
+        [Revenue Tracker]
+        [Analytics Engine]
+        [Payout Handler]
+    }
+
+    component [Streaming Service] <<service>> as StreamSvc {
+        portin " " as stream_in
+        database " " as stream_db
+
+        [Stream Manager]
+        [RTMP Handler]
+        [VOD Manager]
+        [Multi-Platform]
+    }
+}
+
+' Data Layer
+package "Data Layer" {
+    database "PostgreSQL\n(Primary DB)" <<database>> as PostgreSQL
+    database "MongoDB\n(Spatial Data)" <<database>> as MongoDB
+    database "Redis\n(Cache)" <<database>> as Redis
+    database "Elasticsearch\n(Search)" <<database>> as Elasticsearch
+    queue "RabbitMQ\n(Message Queue)" <<database>> as RabbitMQ
+}
+
+' Storage Layer
+package "Storage Layer" {
+    database "S3\n(Media Storage)" <<database>> as S3
+    database "CloudFront\n(CDN)" <<database>> as CDN
+}
+
+' External Services
+package "External Services" {
+    component [Stripe API] <<external>> as Stripe
+    component [OpenStreetMap] <<external>> as OSM
+    component [Claude API] <<external>> as ClaudeAPI
+    component [YouTube/Twitch] <<external>> as StreamPlatforms
+    component [SendGrid] <<external>> as SendGrid
+}
+
+' Monitoring & Observability
+package "Monitoring" {
+    component [Prometheus] <<service>> as Prometheus
+    component [Grafana] <<service>> as Grafana
+    component [Jaeger] <<service>> as Jaeger
+    component [ELK Stack] <<service>> as ELK
+}
+
+' Client to Gateway connections
+WebApp --> gw_in : HTTPS
+MobileApp --> gw_in : HTTPS
+AdminApp --> gw_in : HTTPS
+
+' Gateway to Services
+gw_out --> auth_in : REST
+gw_out --> user_in : REST
+gw_out --> quest_in : REST
+gw_out --> geo_in : REST
+gw_out --> game_in : REST
+gw_out --> social_in : REST
+gw_out --> creator_in : REST
+gw_out --> stream_in : REST
+gw_out --> notify_in : REST
+
+' Service to Database connections
+AuthSvc --> PostgreSQL : SQL
+AuthSvc --> Redis : Cache
+
+UserSvc --> PostgreSQL : SQL
+UserSvc --> Elasticsearch : Search
+
+QuestSvc --> PostgreSQL : SQL
+QuestSvc --> MongoDB : GeoJSON
+QuestSvc --> Elasticsearch : Search
+
+GeoSvc --> MongoDB : GeoJSON
+GeoSvc --> PostgreSQL : SQL
+
+GameSvc --> PostgreSQL : SQL
+GameSvc --> Redis : Leaderboard Cache
+
+SocialSvc --> PostgreSQL : SQL
+SocialSvc --> Redis : Online Status
+
+CreatorSvc --> PostgreSQL : SQL
+
+StreamSvc --> PostgreSQL : SQL
+StreamSvc --> MongoDB : Stream Metadata
+
+NotifySvc --> PostgreSQL : SQL
+
+' Message Queue connections
+QuestSvc --> RabbitMQ : Publish Events
+GameSvc --> RabbitMQ : Subscribe/Publish
+SocialSvc --> RabbitMQ : Subscribe/Publish
+NotifySvc --> RabbitMQ : Subscribe
+
+' Storage connections
+QuestSvc --> S3 : Store Media
+UserSvc --> S3 : Store Avatars
+StreamSvc --> S3 : Store VOD
+
+WebApp --> CDN : Static Assets
+MobileApp --> CDN : Static Assets
+
+' External service connections
+CreatorSvc --> Stripe : Payment Processing
+GeoSvc --> OSM : Map Data
+QuestSvc --> ClaudeAPI : AI Generation
+StreamSvc --> StreamPlatforms : Multi-streaming
+NotifySvc --> SendGrid : Email Delivery
+
+' Inter-service communication
+QuestSvc ..> GeoSvc : Location Validation
+QuestSvc ..> GameSvc : XP Awards
+CreatorSvc ..> NotifySvc : Notifications
+SocialSvc ..> NotifySvc : Notifications
+
+' Monitoring connections
+Gateway ..> Prometheus : Metrics
+AuthSvc ..> Prometheus : Metrics
+QuestSvc ..> Prometheus : Metrics
+GameSvc ..> Prometheus : Metrics
+
+Prometheus --> Grafana : Visualization
+
+Gateway ..> Jaeger : Traces
+QuestSvc ..> Jaeger : Traces
+GeoSvc ..> Jaeger : Traces
+
+Gateway ..> ELK : Logs
+AuthSvc ..> ELK : Logs
+QuestSvc ..> ELK : Logs
+
+note bottom of PostgreSQL
+    **Primary Data Store**
+    - User accounts
+    - Quests & checkpoints
+    - Subscriptions & payments
+    - Achievements & badges
+    - ACID compliance required
+end note
+
+note bottom of MongoDB
+    **Flexible Schema Store**
+    - Geospatial data (GeoJSON)
+    - Quest content (flexible)
+    - Activity feed
+    - Analytics events
+end note
+
+note bottom of Redis
+    **In-Memory Cache**
+    - Session storage
+    - Leaderboard caching
+    - Rate limiting
+    - Real-time data
+    - Pub/Sub for WebSocket
+end note
+
+note bottom of RabbitMQ
+    **Event Bus**
+    - Asynchronous events
+    - Service decoupling
+    - Guaranteed delivery
+    - Event sourcing
+end note
+
+@enduml

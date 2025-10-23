@@ -1,0 +1,508 @@
+openapi: 3.0.3
+info:
+  title: Adventure Management Platform API
+  description: |
+    RESTful API for the Adventure Management Platform - a location-based adventure system
+    with quests, gamification, social features, creator economy, and streaming capabilities.
+
+    ## Features
+    - User authentication and authorization
+    - Quest creation and participation
+    - Geospatial services
+    - Gamification (XP, achievements, leaderboards)
+    - Social networking
+    - Creator economy and subscriptions
+    - Live streaming
+
+    ## Authentication
+    All authenticated endpoints require a Bearer token in the Authorization header:
+    ```
+    Authorization: Bearer {JWT_TOKEN}
+    ```
+
+    ## Rate Limiting
+    - Anonymous: 100 requests/hour
+    - Authenticated: 1000 requests/hour
+    - Premium: 5000 requests/hour
+
+    Rate limit information is included in response headers:
+    - `X-RateLimit-Limit`: Total requests allowed
+    - `X-RateLimit-Remaining`: Remaining requests
+    - `X-RateLimit-Reset`: Unix timestamp when limit resets
+
+  version: 1.0.0
+  contact:
+    name: Adventure Platform API Support
+    email: api-support@adventure-platform.com
+  license:
+    name: Proprietary
+    url: https://adventure-platform.com/terms
+
+servers:
+  - url: https://api.adventure-platform.com/v1
+    description: Production server
+  - url: https://staging-api.adventure-platform.com/v1
+    description: Staging server
+  - url: http://localhost:3000/v1
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Users
+    description: User profile and account management
+  - name: Quests
+    description: Quest creation, management, and participation
+  - name: Geospatial
+    description: Location services, routing, and mapping
+  - name: Gamification
+    description: XP, achievements, leaderboards, and rewards
+  - name: Social
+    description: Friends, teams, messaging, and activity feed
+  - name: Creator
+    description: Creator accounts, subscriptions, and monetization
+  - name: Streaming
+    description: Live streaming and VOD management
+
+paths:
+  # ===== AUTHENTICATION =====
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      description: Create a new user account with email and password
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - username
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: SecureP@ss123
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                  pattern: '^[a-zA-Z0-9_]+$'
+                  example: adventurer123
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email or username already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login user
+      description: Authenticate user and receive JWT tokens
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                        description: JWT access token (15 min expiry)
+                      refreshToken:
+                        type: string
+                        description: JWT refresh token (30 day expiry)
+                      user:
+                        $ref: '#/components/schemas/User'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===== QUESTS =====
+  /quests:
+    get:
+      tags: [Quests]
+      summary: List quests
+      description: Get a paginated list of quests with optional filters
+      operationId: listQuests
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: difficulty
+          in: query
+          schema:
+            type: string
+            enum: [easy, medium, hard, expert]
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, active, completed, archived]
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, difficulty, xpReward]
+            default: createdAt
+      responses:
+        '200':
+          description: List of quests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Quest'
+                  meta:
+                    $ref: '#/components/schemas/PaginatedMeta'
+                  links:
+                    $ref: '#/components/schemas/PaginationLinks'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    post:
+      tags: [Quests]
+      summary: Create quest
+      description: Create a new quest (requires creator role)
+      operationId: createQuest
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuestRequest'
+      responses:
+        '201':
+          description: Quest created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Quest'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /quests/{questId}:
+    get:
+      tags: [Quests]
+      summary: Get quest details
+      operationId: getQuest
+      parameters:
+        - $ref: '#/components/parameters/QuestIdParam'
+      responses:
+        '200':
+          description: Quest details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Quest'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ===== COMPONENTS =====
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number
+
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Items per page
+
+    QuestIdParam:
+      name: questId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Quest ID
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        role:
+          type: string
+          enum: [user, creator, moderator, admin, super_admin]
+        emailVerified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Quest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        creatorId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        difficulty:
+          type: string
+          enum: [easy, medium, hard, expert]
+        state:
+          type: string
+          enum: [draft, published, active, completed, archived]
+        xpReward:
+          type: integer
+        estimatedDuration:
+          type: integer
+          description: Duration in minutes
+        location:
+          $ref: '#/components/schemas/Location'
+        checkpointCount:
+          type: integer
+        participantCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+
+    CreateQuestRequest:
+      type: object
+      required:
+        - title
+        - difficulty
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 255
+        description:
+          type: string
+        difficulty:
+          type: string
+          enum: [easy, medium, hard, expert]
+        xpReward:
+          type: integer
+          minimum: 0
+        estimatedDuration:
+          type: integer
+          minimum: 1
+        location:
+          $ref: '#/components/schemas/Location'
+
+    Location:
+      type: object
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    Meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+        version:
+          type: string
+
+    PaginatedMeta:
+      allOf:
+        - $ref: '#/components/schemas/Meta'
+        - type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
+
+    PaginationLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri
+        first:
+          type: string
+          format: uri
+        prev:
+          type: string
+          format: uri
+        next:
+          type: string
+          format: uri
+        last:
+          type: string
+          format: uri
+
+  responses:
+    BadRequest:
+      description: Bad request - Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized - Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Not found - Resource doesn't exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    TooManyRequests:
+      description: Too many requests - Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

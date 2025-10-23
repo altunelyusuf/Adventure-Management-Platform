@@ -1,0 +1,427 @@
+@startuml Adventure Management Platform - Core Domain Model
+
+!define RECTANGLE
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor<<Entity>> LightBlue
+    BackgroundColor<<ValueObject>> LightYellow
+    BackgroundColor<<Aggregate>> LightGreen
+}
+
+title Adventure Management Platform - Core Domain Model (Simplified)
+
+' User & Authentication
+package "User Domain" <<Rectangle>> {
+  class User <<Entity>> {
+    - id: UUID
+    - email: string
+    - passwordHash: string
+    - username: string
+    - role: UserRole
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    --
+    + register()
+    + login()
+    + updateProfile()
+    + changePassword()
+  }
+
+  class UserProfile <<Entity>> {
+    - userId: UUID
+    - firstName: string
+    - lastName: string
+    - avatar: string
+    - bio: string
+    - location: Location
+    --
+    + update()
+  }
+
+  class Creator <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - tier: CreatorTier
+    - status: CreatorStatus
+    - subscriberCount: int
+    - totalRevenue: decimal
+    --
+    + createQuest()
+    + viewAnalytics()
+    + requestPayout()
+  }
+
+  enum UserRole {
+    USER
+    CREATOR
+    MODERATOR
+    ADMIN
+  }
+
+  enum CreatorTier {
+    BRONZE
+    SILVER
+    GOLD
+    PLATINUM
+  }
+
+  enum CreatorStatus {
+    PENDING
+    ACTIVE
+    SUSPENDED
+    DEACTIVATED
+  }
+}
+
+' Quest Domain
+package "Quest Domain" <<Rectangle>> {
+  class Quest <<Aggregate>> {
+    - id: UUID
+    - creatorId: UUID
+    - title: string
+    - description: string
+    - difficulty: Difficulty
+    - state: QuestState
+    - xpReward: int
+    - duration: int
+    - checkpoints: Checkpoint[]
+    --
+    + create()
+    + publish()
+    + archive()
+    + addCheckpoint()
+  }
+
+  class Checkpoint <<Entity>> {
+    - id: UUID
+    - questId: UUID
+    - order: int
+    - title: string
+    - description: string
+    - location: Location
+    - validationRequired: ValidationType
+    --
+    + validate()
+  }
+
+  class QuestParticipation <<Entity>> {
+    - id: UUID
+    - questId: UUID
+    - userId: UUID
+    - status: ParticipationStatus
+    - startedAt: DateTime
+    - completedAt: DateTime?
+    - progress: int
+    --
+    + start()
+    + updateProgress()
+    + complete()
+  }
+
+  class CheckpointCompletion <<Entity>> {
+    - id: UUID
+    - participationId: UUID
+    - checkpointId: UUID
+    - completedAt: DateTime
+    - proof: Media?
+    - validated: boolean
+    --
+    + submit()
+    + validate()
+  }
+
+  enum QuestState {
+    DRAFT
+    PUBLISHED
+    ACTIVE
+    COMPLETED
+    ARCHIVED
+  }
+
+  enum Difficulty {
+    EASY
+    MEDIUM
+    HARD
+    EXPERT
+  }
+
+  enum ValidationType {
+    GPS
+    PHOTO
+    QR_CODE
+    AR_MARKER
+  }
+
+  enum ParticipationStatus {
+    STARTED
+    IN_PROGRESS
+    COMPLETED
+    ABANDONED
+  }
+}
+
+' Geospatial Domain
+package "Geospatial Domain" <<Rectangle>> {
+  class Location <<ValueObject>> {
+    - latitude: decimal
+    - longitude: decimal
+    - altitude: decimal?
+    - accuracy: decimal
+    --
+    + distanceTo(Location): decimal
+    + isWithinRadius(Location, radius): boolean
+  }
+
+  class Route <<Entity>> {
+    - id: UUID
+    - waypoints: Location[]
+    - totalDistance: decimal
+    - estimatedDuration: int
+    --
+    + calculate()
+    + optimize()
+  }
+
+  class POI <<Entity>> {
+    - id: UUID
+    - name: string
+    - location: Location
+    - type: POIType
+    - description: string
+    --
+    + findNearby(Location, radius): POI[]
+  }
+
+  enum POIType {
+    LANDMARK
+    RESTAURANT
+    PARK
+    MUSEUM
+    NATURAL_FEATURE
+  }
+}
+
+' Gamification Domain
+package "Gamification Domain" <<Rectangle>> {
+  class PlayerStats <<Entity>> {
+    - userId: UUID
+    - totalXP: int
+    - level: int
+    - rank: string
+    - questsCompleted: int
+    - achievementsUnlocked: int
+    --
+    + awardXP(amount: int)
+    + calculateLevel()
+  }
+
+  class Achievement <<Entity>> {
+    - id: UUID
+    - name: string
+    - description: string
+    - criteria: string
+    - xpReward: int
+    - rarity: Rarity
+    - iconUrl: string
+    --
+    + checkUnlock(userId): boolean
+  }
+
+  class Badge <<Entity>> {
+    - id: UUID
+    - achievementId: UUID
+    - userId: UUID
+    - unlockedAt: DateTime
+    --
+    + award()
+  }
+
+  class Leaderboard <<Entity>> {
+    - id: UUID
+    - type: LeaderboardType
+    - period: Period
+    - rankings: Ranking[]
+    --
+    + calculate()
+    + getTop(n: int): Ranking[]
+  }
+
+  enum Rarity {
+    COMMON
+    UNCOMMON
+    RARE
+    EPIC
+    LEGENDARY
+  }
+
+  enum LeaderboardType {
+    GLOBAL
+    REGIONAL
+    FRIENDS
+    TEAM
+  }
+
+  enum Period {
+    DAILY
+    WEEKLY
+    MONTHLY
+    ALL_TIME
+  }
+}
+
+' Social Domain
+package "Social Domain" <<Rectangle>> {
+  class Friendship <<Entity>> {
+    - id: UUID
+    - userId1: UUID
+    - userId2: UUID
+    - status: FriendshipStatus
+    - createdAt: DateTime
+    --
+    + accept()
+    + reject()
+    + remove()
+  }
+
+  class Team <<Aggregate>> {
+    - id: UUID
+    - name: string
+    - leaderId: UUID
+    - members: TeamMember[]
+    - createdAt: DateTime
+    --
+    + addMember()
+    + removeMember()
+    + disband()
+  }
+
+  class TeamMember <<Entity>> {
+    - teamId: UUID
+    - userId: UUID
+    - role: TeamRole
+    - joinedAt: DateTime
+    --
+    + promote()
+    + demote()
+  }
+
+  class Message <<Entity>> {
+    - id: UUID
+    - senderId: UUID
+    - recipientId: UUID
+    - content: string
+    - sentAt: DateTime
+    - readAt: DateTime?
+    --
+    + send()
+    + markAsRead()
+  }
+
+  enum FriendshipStatus {
+    PENDING
+    ACCEPTED
+    REJECTED
+    BLOCKED
+  }
+
+  enum TeamRole {
+    LEADER
+    OFFICER
+    MEMBER
+  }
+}
+
+' Subscription Domain
+package "Subscription Domain" <<Rectangle>> {
+  class Subscription <<Entity>> {
+    - id: UUID
+    - userId: UUID
+    - creatorId: UUID
+    - tier: SubscriptionTier
+    - status: SubscriptionStatus
+    - startDate: DateTime
+    - endDate: DateTime?
+    - autoRenew: boolean
+    --
+    + activate()
+    + cancel()
+    + renew()
+  }
+
+  class Payment <<Entity>> {
+    - id: UUID
+    - subscriptionId: UUID
+    - amount: decimal
+    - currency: string
+    - status: PaymentStatus
+    - stripePaymentId: string
+    - processedAt: DateTime
+    --
+    + process()
+    + refund()
+  }
+
+  enum SubscriptionTier {
+    FREE
+    BASIC
+    PRO
+    ELITE
+  }
+
+  enum SubscriptionStatus {
+    ACTIVE
+    CANCELLED
+    EXPIRED
+    PAUSED
+  }
+
+  enum PaymentStatus {
+    PENDING
+    SUCCEEDED
+    FAILED
+    REFUNDED
+  }
+}
+
+' Relationships
+
+' User relationships
+User "1" -- "1" UserProfile
+User "1" -- "0..1" Creator
+User "1" -- "1" PlayerStats
+User "1" -- "*" QuestParticipation
+User "1" -- "*" Badge
+User "1" -- "*" Friendship
+User "1" -- "*" TeamMember
+User "1" -- "*" Message
+User "1" -- "*" Subscription : subscribes
+
+' Creator relationships
+Creator "1" -- "*" Quest : creates
+Creator "1" -- "*" Subscription : has subscribers
+
+' Quest relationships
+Quest "1" *-- "*" Checkpoint : contains
+Quest "1" -- "*" QuestParticipation
+Checkpoint "1" -- "*" CheckpointCompletion
+
+' Quest - Location
+Checkpoint "*" -- "1" Location
+POI "*" -- "1" Location
+Route "1" *-- "*" Location : waypoints
+
+' Gamification relationships
+Achievement "1" -- "*" Badge
+PlayerStats "1" -- "*" Badge
+
+' Participation relationships
+QuestParticipation "1" *-- "*" CheckpointCompletion
+
+' Team relationships
+Team "1" *-- "*" TeamMember
+TeamMember "*" -- "1" User
+
+' Subscription relationships
+Subscription "1" -- "*" Payment
+
+@enduml

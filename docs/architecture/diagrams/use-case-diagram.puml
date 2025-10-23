@@ -1,0 +1,194 @@
+@startuml Adventure Management Platform - Use Case Diagram
+
+!define RECTANGLE
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+
+title Adventure Management Platform - Use Case Diagram
+
+' Actors
+actor "User" as User
+actor "Creator" as Creator
+actor "Admin" as Admin
+actor "Moderator" as Moderator
+
+' External Systems
+actor "Payment Gateway\n(Stripe)" as Stripe
+actor "Map Service\n(OpenStreetMap)" as OSM
+actor "AI Service\n(Claude)" as AI
+actor "Streaming Platform\n(YouTube/Twitch)" as StreamPlatform
+
+' System boundary
+rectangle "Adventure Management Platform" {
+
+  ' User Management
+  package "User Management" {
+    usecase "Register Account" as UC1
+    usecase "Login" as UC2
+    usecase "Manage Profile" as UC3
+    usecase "Update Preferences" as UC4
+    usecase "Reset Password" as UC5
+  }
+
+  ' Quest Management
+  package "Quest Management" {
+    usecase "Browse Quests" as UC10
+    usecase "Search Quests" as UC11
+    usecase "View Quest Details" as UC12
+    usecase "Participate in Quest" as UC13
+    usecase "Complete Checkpoint" as UC14
+    usecase "Submit Quest Completion" as UC15
+    usecase "Rate Quest" as UC16
+  }
+
+  ' Creator Features
+  package "Creator Features" {
+    usecase "Create Quest" as UC20
+    usecase "Edit Quest" as UC21
+    usecase "Add Checkpoints" as UC22
+    usecase "Generate Quest with AI" as UC23
+    usecase "Publish Quest" as UC24
+    usecase "Manage Subscriptions" as UC25
+    usecase "View Analytics" as UC26
+    usecase "Withdraw Earnings" as UC27
+  }
+
+  ' Gamification
+  package "Gamification" {
+    usecase "Earn XP" as UC30
+    usecase "Level Up" as UC31
+    usecase "Unlock Achievement" as UC32
+    usecase "Collect Badge" as UC33
+    usecase "View Leaderboard" as UC34
+    usecase "Track Streaks" as UC35
+  }
+
+  ' Social Features
+  package "Social Features" {
+    usecase "Add Friends" as UC40
+    usecase "Create Team" as UC41
+    usecase "Join Team" as UC42
+    usecase "Send Message" as UC43
+    usecase "Share Activity" as UC44
+    usecase "View Feed" as UC45
+  }
+
+  ' Streaming
+  package "Streaming" {
+    usecase "Start Stream" as UC50
+    usecase "Stop Stream" as UC51
+    usecase "Watch Stream" as UC52
+    usecase "Send Virtual Gift" as UC53
+    usecase "Chat in Stream" as UC54
+    usecase "Multi-Stream" as UC55
+  }
+
+  ' Geospatial
+  package "Geospatial" {
+    usecase "View Map" as UC60
+    usecase "Get Directions" as UC61
+    usecase "Validate Location" as UC62
+    usecase "Find Nearby Quests" as UC63
+    usecase "Track Route" as UC64
+  }
+
+  ' Payment & Monetization
+  package "Payment & Monetization" {
+    usecase "Subscribe to Creator" as UC70
+    usecase "Process Payment" as UC71
+    usecase "Manage Subscription" as UC72
+    usecase "Send Tip" as UC73
+  }
+
+  ' Administration
+  package "Administration" {
+    usecase "Moderate Content" as UC80
+    usecase "Review Reports" as UC81
+    usecase "Manage Users" as UC82
+    usecase "Configure Platform" as UC83
+    usecase "View System Metrics" as UC84
+  }
+}
+
+' User relationships
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+User --> UC10
+User --> UC11
+User --> UC12
+User --> UC13
+User --> UC14
+User --> UC15
+User --> UC16
+User --> UC30
+User --> UC31
+User --> UC32
+User --> UC33
+User --> UC34
+User --> UC35
+User --> UC40
+User --> UC41
+User --> UC42
+User --> UC43
+User --> UC44
+User --> UC45
+User --> UC52
+User --> UC53
+User --> UC54
+User --> UC60
+User --> UC61
+User --> UC63
+User --> UC64
+User --> UC70
+User --> UC72
+User --> UC73
+
+' Creator relationships (Creator is also a User)
+Creator --> UC20
+Creator --> UC21
+Creator --> UC22
+Creator --> UC23
+Creator --> UC24
+Creator --> UC25
+Creator --> UC26
+Creator --> UC27
+Creator --> UC50
+Creator --> UC51
+Creator --> UC55
+
+' Admin relationships
+Admin --> UC80
+Admin --> UC81
+Admin --> UC82
+Admin --> UC83
+Admin --> UC84
+
+' Moderator relationships
+Moderator --> UC80
+Moderator --> UC81
+
+' External system relationships
+UC23 ..> AI : uses
+UC71 ..> Stripe : uses
+UC60 ..> OSM : uses
+UC61 ..> OSM : uses
+UC62 ..> OSM : uses
+UC55 ..> StreamPlatform : uses
+
+' Include relationships
+UC13 .> UC62 : <<include>>
+UC14 .> UC62 : <<include>>
+UC15 .> UC14 : <<include>>
+UC20 .> UC22 : <<include>>
+UC70 .> UC71 : <<include>>
+UC73 .> UC71 : <<include>>
+
+' Extend relationships
+UC31 .> UC30 : <<extend>>
+UC32 .> UC30 : <<extend>>
+UC33 .> UC30 : <<extend>>
+
+@enduml

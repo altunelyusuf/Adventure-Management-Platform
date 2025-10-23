@@ -1,0 +1,240 @@
+@startuml Adventure Management Platform - Deployment Diagram
+
+!define AWSPuml https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v14.0/dist
+!include AWSPuml/AWSCommon.puml
+!include AWSPuml/Compute/all.puml
+!include AWSPuml/Database/all.puml
+!include AWSPuml/NetworkingContentDelivery/all.puml
+!include AWSPuml/Storage/all.puml
+
+title Adventure Management Platform - AWS Deployment Architecture
+
+skinparam rectangle {
+    BackgroundColor<<zone>> LightBlue
+    BackgroundColor<<k8s>> LightGreen
+}
+
+' Edge Layer
+CloudFront(cdn, "CloudFront CDN", "Content Delivery")
+Route53(dns, "Route 53", "DNS")
+
+' Load Balancing
+ElasticLoadBalancingApplicationLoadBalancer(alb, "Application Load Balancer", "")
+
+' Availability Zones
+rectangle "Region: us-east-1" {
+
+    rectangle "Availability Zone A" <<zone>> {
+
+        rectangle "EKS Cluster - AZ-A" <<k8s>> {
+
+            collections "API Gateway Pods" as gw_a
+            collections "Auth Service Pods" as auth_a
+            collections "User Service Pods" as user_a
+            collections "Quest Service Pods" as quest_a
+            collections "Geospatial Service Pods" as geo_a
+            collections "Gamification Service Pods" as game_a
+            collections "Social Service Pods" as social_a
+            collections "Creator Service Pods" as creator_a
+            collections "Streaming Service Pods" as stream_a
+            collections "Notification Service Pods" as notify_a
+        }
+    }
+
+    rectangle "Availability Zone B" <<zone>> {
+
+        rectangle "EKS Cluster - AZ-B" <<k8s>> {
+
+            collections "API Gateway Pods" as gw_b
+            collections "Auth Service Pods" as auth_b
+            collections "User Service Pods" as user_b
+            collections "Quest Service Pods" as quest_b
+            collections "Geospatial Service Pods" as geo_b
+            collections "Gamification Service Pods" as game_b
+            collections "Social Service Pods" as social_b
+            collections "Creator Service Pods" as creator_b
+            collections "Streaming Service Pods" as stream_b
+            collections "Notification Service Pods" as notify_b
+        }
+    }
+
+    ' Data Layer
+    rectangle "Data Layer - Multi-AZ" {
+
+        RDSPostgreSQLinstance(rds_primary, "RDS PostgreSQL", "Primary")
+        RDSPostgreSQLinstance(rds_replica, "RDS PostgreSQL", "Read Replica")
+
+        ElastiCache(redis_primary, "ElastiCache Redis", "Primary")
+        ElastiCache(redis_replica, "ElastiCache Redis", "Replica")
+
+        DocumentDB(docdb, "DocumentDB", "MongoDB-compatible")
+
+        Elasticsearch(es, "Amazon Elasticsearch", "Search & Analytics")
+
+        AmazonMQ(mq, "Amazon MQ", "RabbitMQ")
+    }
+
+    ' Storage
+    SimpleStorageService(s3_media, "S3 Bucket", "Media Assets")
+    SimpleStorageService(s3_backup, "S3 Bucket", "Backups")
+}
+
+' Monitoring & Observability
+rectangle "Monitoring & Observability" {
+    collections "CloudWatch" as cw
+    collections "Prometheus" as prom
+    collections "Grafana" as graf
+    collections "Jaeger" as jaeger
+}
+
+' External Services
+rectangle "External Services" {
+    collections "Stripe API" as stripe
+    collections "OpenStreetMap" as osm
+    collections "Claude API" as claude
+    collections "Twitch/YouTube" as streaming_ext
+    collections "SendGrid" as sendgrid
+}
+
+' Client Layer
+actor "Web Users" as web
+actor "Mobile Users" as mobile
+actor "Admin Users" as admin
+
+' Connections - Client to Edge
+web --> dns
+mobile --> dns
+admin --> dns
+
+dns --> cdn
+cdn --> alb
+
+' Load Balancer to Services
+alb --> gw_a
+alb --> gw_b
+
+' API Gateway to Services (AZ-A)
+gw_a --> auth_a
+gw_a --> user_a
+gw_a --> quest_a
+gw_a --> geo_a
+gw_a --> game_a
+gw_a --> social_a
+gw_a --> creator_a
+gw_a --> stream_a
+gw_a --> notify_a
+
+' API Gateway to Services (AZ-B)
+gw_b --> auth_b
+gw_b --> user_b
+gw_b --> quest_b
+gw_b --> geo_b
+gw_b --> game_b
+gw_b --> social_b
+gw_b --> creator_b
+gw_b --> stream_b
+gw_b --> notify_b
+
+' Services to Data Layer (AZ-A)
+auth_a --> rds_primary
+user_a --> rds_primary
+quest_a --> rds_primary
+game_a --> rds_primary
+social_a --> rds_primary
+creator_a --> rds_primary
+
+quest_a --> docdb
+geo_a --> docdb
+
+auth_a --> redis_primary
+game_a --> redis_primary
+social_a --> redis_primary
+
+quest_a --> es
+user_a --> es
+
+notify_a --> mq
+game_a --> mq
+social_a --> mq
+
+' Services to Data Layer (AZ-B) - Similar connections
+auth_b --> rds_replica
+user_b --> rds_replica
+quest_b --> rds_replica
+
+quest_b --> docdb
+geo_b --> docdb
+
+auth_b --> redis_replica
+game_b --> redis_replica
+
+quest_b --> es
+
+notify_b --> mq
+game_b --> mq
+
+' Database Replication
+rds_primary --> rds_replica : Replication
+redis_primary --> redis_replica : Replication
+
+' Storage connections
+quest_a --> s3_media
+stream_a --> s3_media
+user_a --> s3_media
+
+rds_primary --> s3_backup : Backups
+docdb --> s3_backup : Backups
+
+' Monitoring connections
+gw_a ..> cw
+auth_a ..> cw
+quest_a ..> cw
+
+gw_a ..> prom
+auth_a ..> prom
+quest_a ..> prom
+
+prom --> graf
+gw_a ..> jaeger
+quest_a ..> jaeger
+
+' External service connections
+creator_a --> stripe
+geo_a --> osm
+quest_a --> claude
+stream_a --> streaming_ext
+notify_a --> sendgrid
+
+note bottom of rds_primary
+  **PostgreSQL Configuration**
+  - Instance: db.r6g.xlarge
+  - Multi-AZ deployment
+  - Automated backups (30 days)
+  - Encryption at rest
+end note
+
+note bottom of redis_primary
+  **Redis Configuration**
+  - Cache.r6g.large
+  - Cluster mode enabled
+  - Multi-AZ with failover
+  - Encryption in-transit
+end note
+
+note bottom of gw_a
+  **Auto-scaling Configuration**
+  - Min pods: 3
+  - Max pods: 20
+  - CPU target: 70%
+  - Memory target: 80%
+end note
+
+note right of alb
+  **Load Balancer**
+  - SSL/TLS termination
+  - Health checks enabled
+  - Connection draining
+  - Sticky sessions
+end note
+
+@enduml

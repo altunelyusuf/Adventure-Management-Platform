@@ -1,0 +1,150 @@
+@startuml Quest Checkpoint Completion - Sequence Diagram
+
+title Quest Checkpoint Completion Flow
+
+actor User
+participant "Mobile App" as App
+participant "API Gateway" as Gateway
+participant "Auth Service" as Auth
+participant "Quest Service" as Quest
+participant "Geospatial Service" as Geo
+participant "Gamification Service" as Game
+participant "Social Service" as Social
+participant "Notification Service" as Notify
+database "PostgreSQL" as DB
+queue "RabbitMQ" as Queue
+
+== User Arrives at Checkpoint ==
+
+User -> App: Arrive at checkpoint location
+App -> App: Get GPS coordinates
+App -> Gateway: POST /quest-participations/{id}/checkpoints/{checkpointId}/complete\n{location, photo}
+activate Gateway
+
+Gateway -> Auth: Validate JWT token
+activate Auth
+Auth --> Gateway: User authenticated
+deactivate Auth
+
+Gateway -> Quest: Complete checkpoint request
+activate Quest
+
+== Validate Location ==
+
+Quest -> Geo: Validate location\n{lat, long, checkpointId}
+activate Geo
+
+Geo -> DB: Get checkpoint location
+DB --> Geo: Checkpoint coordinates
+
+Geo -> Geo: Calculate distance\nbetween user and checkpoint
+alt Distance > 50 meters
+    Geo --> Quest: Location invalid (too far)
+    Quest --> Gateway: 400 Bad Request:\nToo far from checkpoint
+    Gateway --> App: Error: Not at checkpoint
+    App --> User: "You're not at the checkpoint location"
+else Distance <= 50 meters
+    Geo --> Quest: Location valid
+    deactivate Geo
+
+    == Save Checkpoint Completion ==
+
+    Quest -> DB: BEGIN TRANSACTION
+
+    Quest -> DB: INSERT checkpoint_completion\n(participation_id, checkpoint_id, location, photo_url)
+    DB --> Quest: Completion saved
+
+    Quest -> DB: UPDATE quest_participation\nSET progress = progress + 1
+    DB --> Quest: Participation updated
+
+    Quest -> DB: SELECT * FROM quest_participation\nWHERE id = participation_id
+    DB --> Quest: Participation details
+
+    alt All checkpoints completed
+        Quest -> DB: UPDATE quest_participation\nSET status = 'COMPLETED',\ncompleted_at = NOW()
+        DB --> Quest: Quest marked complete
+        Quest -> Quest: Calculate total XP reward
+    end
+
+    Quest -> DB: COMMIT TRANSACTION
+
+    == Publish Event ==
+
+    Quest -> Queue: Publish "CheckpointCompleted" event\n{userId, questId, checkpointId, xpEarned}
+    activate Queue
+
+    Quest --> Gateway: 200 OK\n{completion, xpEarned, nextCheckpoint}
+    deactivate Quest
+
+    Gateway --> App: Checkpoint completed successfully
+    deactivate Gateway
+
+    App --> User: "Checkpoint completed!\n+50 XP earned"
+
+    == Asynchronous Event Processing ==
+
+    Queue -> Game: Consume "CheckpointCompleted"
+    activate Game
+
+    Game -> DB: UPDATE player_stats\nSET total_xp = total_xp + xp_earned
+    DB --> Game: XP updated
+
+    Game -> Game: Check for level up
+    alt Level up achieved
+        Game -> DB: UPDATE player_stats\nSET level = level + 1
+        DB --> Game: Level updated
+
+        Game -> Queue: Publish "LevelUp" event
+        Queue --> Game: Event published
+    end
+
+    Game -> Game: Check achievements
+    alt Achievement unlocked
+        Game -> DB: INSERT badge\n(user_id, achievement_id)
+        DB --> Game: Badge awarded
+
+        Game -> Queue: Publish "AchievementUnlocked" event
+        Queue --> Game: Event published
+    end
+
+    deactivate Game
+
+    Queue -> Social: Consume "CheckpointCompleted"
+    activate Social
+
+    Social -> DB: INSERT activity_feed_post\n(user_id, type='checkpoint', data)
+    DB --> Social: Post created
+
+    Social -> DB: SELECT friends WHERE user_id = userId
+    DB --> Social: Friend list
+
+    Social -> Queue: Publish "NewFeedPost" event
+    deactivate Social
+
+    Queue -> Notify: Consume "CheckpointCompleted"
+    activate Notify
+
+    Notify -> DB: SELECT notification_preferences\nWHERE user_id = userId
+    DB --> Notify: User preferences
+
+    alt Push notifications enabled
+        Notify -> Notify: Send push notification\n"Checkpoint completed!"
+    end
+
+    alt Achievement unlocked
+        Notify -> Notify: Send push notification\n"Achievement unlocked!"
+    end
+
+    deactivate Notify
+    deactivate Queue
+
+    == Real-time Update ==
+
+    App <-- Gateway: WebSocket: XP updated
+    App <-- Gateway: WebSocket: Level up (if applicable)
+    App <-- Gateway: WebSocket: Achievement unlocked (if applicable)
+
+    App -> User: Show celebration animation
+end
+
+@enduml
