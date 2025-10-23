@@ -1,12 +1,16 @@
 import { Response } from 'express';
 import { ParticipationService } from '../services/participation.service';
+import { AnalyticsService } from '../services/analytics.service';
 import { ParticipationStatus } from '../models/QuestParticipation.entity';
+import { AnalyticsEventType } from '../models/QuestAnalytics.entity';
 
 export class ParticipationController {
   private participationService: ParticipationService;
+  private analyticsService: AnalyticsService;
 
   constructor() {
     this.participationService = new ParticipationService();
+    this.analyticsService = new AnalyticsService();
   }
 
   startQuest = async (req: any, res: Response): Promise<void> => {
@@ -28,6 +32,9 @@ export class ParticipationController {
         res.status(404).json({ error: 'Quest not found or not published' });
         return;
       }
+
+      // Track analytics
+      await this.analyticsService.trackEvent(questId, AnalyticsEventType.START, userId);
 
       res.status(201).json({
         success: true,
@@ -112,6 +119,29 @@ export class ParticipationController {
         return;
       }
 
+      // Get participation to track quest completion
+      const participation = await this.participationService.getParticipation(participationId, userId);
+
+      if (participation) {
+        // Track checkpoint completion
+        await this.analyticsService.trackEvent(
+          participation.questId,
+          AnalyticsEventType.CHECKPOINT_COMPLETE,
+          userId,
+          { checkpointId, participationId }
+        );
+
+        // Track quest completion if finished
+        if (participation.status === ParticipationStatus.COMPLETED) {
+          await this.analyticsService.trackEvent(
+            participation.questId,
+            AnalyticsEventType.COMPLETE,
+            userId,
+            { participationId }
+          );
+        }
+      }
+
       res.status(200).json({
         success: true,
         message: 'Checkpoint completed successfully',
@@ -133,11 +163,24 @@ export class ParticipationController {
 
       const { participationId } = req.params;
 
+      // Get participation before abandoning to get questId
+      const participation = await this.participationService.getParticipation(participationId, userId);
+
       const success = await this.participationService.abandonQuest(participationId, userId);
 
       if (!success) {
         res.status(404).json({ error: 'Participation not found' });
         return;
+      }
+
+      // Track analytics
+      if (participation) {
+        await this.analyticsService.trackEvent(
+          participation.questId,
+          AnalyticsEventType.ABANDON,
+          userId,
+          { participationId }
+        );
       }
 
       res.status(200).json({
@@ -166,6 +209,9 @@ export class ParticipationController {
         return;
       }
 
+      // Get participation to get questId
+      const participation = await this.participationService.getParticipation(participationId, userId);
+
       const success = await this.participationService.rateQuest(
         participationId,
         userId,
@@ -176,6 +222,16 @@ export class ParticipationController {
       if (!success) {
         res.status(404).json({ error: 'Participation not found or quest not completed' });
         return;
+      }
+
+      // Track analytics
+      if (participation) {
+        await this.analyticsService.trackEvent(
+          participation.questId,
+          AnalyticsEventType.RATE,
+          userId,
+          { participationId, rating }
+        );
       }
 
       res.status(200).json({

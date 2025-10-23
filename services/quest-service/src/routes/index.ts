@@ -2,6 +2,8 @@ import { Router } from 'express';
 import questRoutes from './quest.routes';
 import checkpointRoutes from './checkpoint.routes';
 import participationRoutes from './participation.routes';
+import templateRoutes from './template.routes';
+import discoveryRoutes from './discovery.routes';
 import { CheckpointController } from '../controllers/checkpoint.controller';
 
 const router = Router();
@@ -20,5 +22,11 @@ router.use('/checkpoints', checkpointRoutes);
 
 // Participation routes
 router.use('/participations', participationRoutes);
+
+// Template routes
+router.use('/templates', templateRoutes);
+
+// Discovery routes (bookmarks, featured, trending, recommendations, analytics)
+router.use('/discovery', discoveryRoutes);
 
 export default router;

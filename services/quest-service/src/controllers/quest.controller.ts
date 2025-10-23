@@ -1,12 +1,16 @@
 import { Request, Response } from 'express';
 import { QuestService } from '../services/quest.service';
+import { AnalyticsService } from '../services/analytics.service';
 import { QuestDifficulty, QuestStatus } from '../models/Quest.entity';
+import { AnalyticsEventType } from '../models/QuestAnalytics.entity';
 
 export class QuestController {
   private questService: QuestService;
+  private analyticsService: AnalyticsService;
 
   constructor() {
     this.questService = new QuestService();
+    this.analyticsService = new AnalyticsService();
   }
 
   createQuest = async (req: any, res: Response): Promise<void> => {
@@ -47,6 +51,9 @@ export class QuestController {
       // Increment view count
       await this.questService.incrementViewCount(questId);
 
+      // Track analytics
+      await this.analyticsService.trackEvent(questId, AnalyticsEventType.VIEW, requesterId);
+
       res.status(200).json({ quest });
     } catch (error: any) {
       console.error('Error getting quest:', error);
@@ -67,6 +74,9 @@ export class QuestController {
       }
 
       await this.questService.incrementViewCount(quest.questId);
+
+      // Track analytics
+      await this.analyticsService.trackEvent(quest.questId, AnalyticsEventType.VIEW, requesterId);
 
       res.status(200).json({ quest });
     } catch (error: any) {
