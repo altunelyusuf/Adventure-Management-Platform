@@ -7,6 +7,7 @@ import { initializeRedis, closeRedis } from './config/redis';
 import { errorHandler } from './middleware/errorHandler.middleware';
 import { logger } from './utils/logger.util';
 import authRoutes from './routes/auth.routes';
+import rbacRoutes from './routes/rbac.routes';
 
 // Validate configuration
 validateConfig();
@@ -34,6 +35,7 @@ app.use((req: Request, res: Response, next) => {
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/rbac', rbacRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {

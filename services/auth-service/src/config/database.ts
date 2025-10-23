@@ -1,6 +1,6 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from './index';
-import { User, RefreshToken, LoginAttempt } from '../models';
+import { User, RefreshToken, LoginAttempt, Role, Permission, UserRoleEntity } from '../models';
 
 const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
@@ -12,7 +12,7 @@ const dataSourceOptions: DataSourceOptions = {
   ssl: config.database.ssl,
   synchronize: config.database.synchronize,
   logging: config.database.logging,
-  entities: [User, RefreshToken, LoginAttempt],
+  entities: [User, RefreshToken, LoginAttempt, Role, Permission, UserRoleEntity],
   migrations: ['src/migrations/**/*.ts'],
   subscribers: ['src/subscribers/**/*.ts'],
 };
@@ -23,6 +23,12 @@ export async function initializeDatabase(): Promise<void> {
   try {
     await AppDataSource.initialize();
     console.log('✅ Database connection established successfully');
+
+    // Seed RBAC on first run (development only)
+    if (config.nodeEnv === 'development' || process.env.SEED_RBAC === 'true') {
+      const { seedRBAC } = await import('../utils/seed-rbac.util');
+      await seedRBAC();
+    }
   } catch (error) {
     console.error('❌ Error initializing database:', error);
     throw error;

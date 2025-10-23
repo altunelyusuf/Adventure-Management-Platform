@@ -5,7 +5,9 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  OneToMany,
 } from 'typeorm';
+import { UserRole as UserRoleEntity } from './UserRole.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -77,4 +79,8 @@ export class User {
 
   @Column({ type: 'timestamp', nullable: true, name: 'locked_until' })
   lockedUntil?: Date;
+
+  // RBAC: Many-to-many relationship with roles
+  @OneToMany(() => UserRoleEntity, (userRole) => userRole.user)
+  userRoles!: UserRoleEntity[];
 }

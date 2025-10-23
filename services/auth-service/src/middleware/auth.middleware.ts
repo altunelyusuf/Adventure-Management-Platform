@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt.util';
 import { UnauthorizedError, ForbiddenError } from './errorHandler.middleware';
 import { UserRole } from '../models';
+import { RBACService } from '../services/rbac.service';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -84,4 +85,76 @@ export function optionalAuthenticate(req: AuthRequest, res: Response, next: Next
     // Ignore errors for optional authentication
     next();
   }
+}
+
+/**
+ * RBAC Middleware: Require specific permission
+ */
+export function requirePermission(permissionName: string) {
+  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const rbacService = new RBACService();
+      const hasPermission = await rbacService.hasPermission(req.user.userId, permissionName);
+
+      if (!hasPermission) {
+        throw new ForbiddenError(`Permission '${permissionName}' required`);
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+/**
+ * RBAC Middleware: Require any of the specified permissions
+ */
+export function requireAnyPermission(...permissionNames: string[]) {
+  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const rbacService = new RBACService();
+      const hasPermission = await rbacService.hasAnyPermission(req.user.userId, permissionNames);
+
+      if (!hasPermission) {
+        throw new ForbiddenError(`One of these permissions required: ${permissionNames.join(', ')}`);
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+/**
+ * RBAC Middleware: Require all of the specified permissions
+ */
+export function requireAllPermissions(...permissionNames: string[]) {
+  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const rbacService = new RBACService();
+      const hasPermission = await rbacService.hasAllPermissions(req.user.userId, permissionNames);
+
+      if (!hasPermission) {
+        throw new ForbiddenError(`All permissions required: ${permissionNames.join(', ')}`);
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
 }
