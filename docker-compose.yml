@@ -323,6 +323,90 @@ services:
       start_period: 40s
     restart: unless-stopped
 
+  # Gamification Service - XP, Achievements, Leaderboards, Challenges
+  gamification-service:
+    build:
+      context: ./services/gamification-service
+      dockerfile: Dockerfile
+    container_name: adventure-gamification-service
+    environment:
+      NODE_ENV: development
+      GAMIFICATION_SERVICE_PORT: 3005
+      SERVICE_NAME: gamification-service
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: adventure_user
+      POSTGRES_PASSWORD: adventure_pass
+      POSTGRES_DB: adventure_platform
+      POSTGRES_SSL: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 3
+      JWT_ACCESS_SECRET: dev-access-secret-change-in-production
+      AUTH_SERVICE_URL: http://auth-service:3001
+      QUEST_SERVICE_URL: http://quest-service:3004
+      USER_SERVICE_URL: http://user-service:3003
+      # XP System Configuration
+      XP_CHECKPOINT_EASY: 50
+      XP_CHECKPOINT_MEDIUM: 100
+      XP_CHECKPOINT_HARD: 200
+      XP_CHECKPOINT_EXPERT: 400
+      XP_QUEST_EASY: 500
+      XP_QUEST_MEDIUM: 1000
+      XP_QUEST_HARD: 2000
+      XP_QUEST_EXPERT: 4000
+      XP_DAILY_LOGIN: 50
+      XP_FIRST_QUEST_DAILY: 200
+      XP_SOCIAL_SHARE: 25
+      XP_PHOTO_UPLOAD: 10
+      XP_QUEST_REVIEW: 50
+      XP_FRIEND_REFERRAL: 1000
+      # XP Bonuses
+      XP_PERFECT_COMPLETION_BONUS: 25
+      XP_SPEED_COMPLETION_BONUS: 15
+      XP_FIRST_COMPLETION_BONUS: 50
+      XP_WEEKEND_BONUS: 10
+      # Level Configuration
+      LEVEL_BASE_XP: 1000
+      LEVEL_GROWTH_RATE: 1.15
+      MAX_LEVEL: 100
+      # Achievement Configuration
+      ACHIEVEMENT_XP_REWARD: 100
+      # Leaderboard Configuration
+      LEADERBOARD_PAGE_SIZE: 50
+      LEADERBOARD_CACHE_TTL: 300
+      LEADERBOARD_TOP_N: 100
+      # Challenge Configuration
+      CHALLENGE_RESET_HOUR: 0
+      CHALLENGE_XP_MULTIPLIER: 1.5
+      # Streak Configuration
+      STREAK_GRACE_PERIOD_HOURS: 6
+      STREAK_MAX_FREEZE_COUNT: 3
+      STREAK_XP_PER_DAY: 50
+      # Seeding
+      SEED_GAMIFICATION_DATA: "true"
+      # Logging
+      LOG_LEVEL: info
+    ports:
+      - "3005:3005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      quest-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3005/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
