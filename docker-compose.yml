@@ -473,6 +473,227 @@ services:
       start_period: 40s
     restart: unless-stopped
 
+  # Geospatial Service - GPS tracking, routing, geofencing
+  geospatial-service:
+    build:
+      context: ./services/geospatial-service
+      dockerfile: Dockerfile
+    container_name: adventure-geospatial-service
+    environment:
+      NODE_ENV: development
+      GEOSPATIAL_SERVICE_PORT: 3007
+      SERVICE_NAME: geospatial-service
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: adventure_user
+      POSTGRES_PASSWORD: adventure_pass
+      POSTGRES_DB: adventure_platform
+      POSTGRES_SSL: "false"
+      MONGODB_URI: mongodb://adventure_user:adventure_pass@mongodb:27017/adventure_platform
+      MONGODB_DATABASE: adventure_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 5
+      JWT_ACCESS_SECRET: dev-access-secret-change-in-production
+      AUTH_SERVICE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3003
+      QUEST_SERVICE_URL: http://quest-service:3004
+      DEFAULT_GEOFENCE_RADIUS: 50
+      MAX_TRACKING_DISTANCE_KM: 500
+      LOCATION_UPDATE_INTERVAL_MS: 5000
+      MAX_LOCATION_HISTORY: 1000
+      ENABLE_REAL_TIME_TRACKING: "true"
+      DEFAULT_ROUTING_PROFILE: walking
+      MAX_WAYPOINTS: 25
+      LOG_LEVEL: info
+    ports:
+      - "3007:3007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3007/api/geospatial/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  # Notification Service - Push notifications, emails, in-app
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: adventure-notification-service
+    environment:
+      NODE_ENV: development
+      NOTIFICATION_SERVICE_PORT: 3008
+      SERVICE_NAME: notification-service
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: adventure_user
+      POSTGRES_PASSWORD: adventure_pass
+      POSTGRES_DB: adventure_platform
+      POSTGRES_SSL: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 6
+      JWT_ACCESS_SECRET: dev-access-secret-change-in-production
+      AUTH_SERVICE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3003
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_SECURE: "false"
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
+      EMAIL_FROM: noreply@adventure-platform.com
+      EMAIL_FROM_NAME: Adventure Platform
+      MAX_NOTIFICATIONS_PER_USER: 1000
+      NOTIFICATION_RETENTION_DAYS: 90
+      ENABLE_EMAIL_NOTIFICATIONS: "true"
+      ENABLE_PUSH_NOTIFICATIONS: "true"
+      ENABLE_IN_APP_NOTIFICATIONS: "true"
+      LOG_LEVEL: info
+    ports:
+      - "3008:3008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3008/api/notifications/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  # Payment Service - Stripe integration, subscriptions
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: adventure-payment-service
+    environment:
+      NODE_ENV: development
+      PAYMENT_SERVICE_PORT: 3009
+      SERVICE_NAME: payment-service
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: adventure_user
+      POSTGRES_PASSWORD: adventure_pass
+      POSTGRES_DB: adventure_platform
+      POSTGRES_SSL: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 7
+      JWT_ACCESS_SECRET: dev-access-secret-change-in-production
+      AUTH_SERVICE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3003
+      NOTIFICATION_SERVICE_URL: http://notification-service:3008
+      STRIPE_SECRET_KEY: sk_test_your_key_here
+      STRIPE_PUBLISHABLE_KEY: pk_test_your_key_here
+      STRIPE_WEBHOOK_SECRET: whsec_your_webhook_secret_here
+      PLATFORM_FEE_PERCENTAGE: 30
+      CREATOR_SHARE_PERCENTAGE: 70
+      CURRENCY: USD
+      MIN_SUBSCRIPTION_PRICE: 4.99
+      MAX_SUBSCRIPTION_PRICE: 99.99
+      MIN_PAYOUT_AMOUNT: 50.00
+      PAYOUT_SCHEDULE: monthly
+      AUTO_PAYOUT_ENABLED: "true"
+      LOG_LEVEL: info
+    ports:
+      - "3009:3009"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3009/api/payments/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  # API Gateway - Unified entry point
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: adventure-api-gateway
+    environment:
+      NODE_ENV: development
+      GATEWAY_PORT: 3000
+      SERVICE_NAME: api-gateway
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 8
+      AUTH_SERVICE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3003
+      QUEST_SERVICE_URL: http://quest-service:3004
+      GAMIFICATION_SERVICE_URL: http://gamification-service:3005
+      SOCIAL_SERVICE_URL: http://social-service:3006
+      GEOSPATIAL_SERVICE_URL: http://geospatial-service:3007
+      NOTIFICATION_SERVICE_URL: http://notification-service:3008
+      PAYMENT_SERVICE_URL: http://payment-service:3009
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX_REQUESTS: 100
+      CORS_ORIGIN: http://localhost:3000,http://localhost:3001
+      CORS_CREDENTIALS: "true"
+      MAX_REQUEST_SIZE: 10mb
+      REQUEST_TIMEOUT_MS: 30000
+      ENABLE_HELMET: "true"
+      TRUST_PROXY: "false"
+      LOG_LEVEL: info
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      quest-service:
+        condition: service_healthy
+      gamification-service:
+        condition: service_healthy
+      social-service:
+        condition: service_healthy
+      geospatial-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:

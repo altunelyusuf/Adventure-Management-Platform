@@ -1,0 +1,46 @@
+{
+  "name": "@adventure-platform/payment-service",
+  "version": "1.0.0",
+  "description": "Payment Service for Adventure Platform - Stripe integration, subscriptions, payouts",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": ["payment", "stripe", "subscription", "monetization"],
+  "author": "Adventure Platform Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "typeorm": "^0.3.17",
+    "pg": "^8.11.3",
+    "redis": "^4.6.10",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.2",
+    "stripe": "^14.9.0",
+    "joi": "^17.11.0",
+    "winston": "^3.11.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/uuid": "^9.0.7",
+    "typescript": "^5.3.2",
+    "ts-node-dev": "^2.0.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.10",
+    "ts-jest": "^29.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
