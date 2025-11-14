@@ -407,6 +407,72 @@ services:
       start_period: 40s
     restart: unless-stopped
 
+  # Social Service - Friends, Feed, Interactions
+  social-service:
+    build:
+      context: ./services/social-service
+      dockerfile: Dockerfile
+    container_name: adventure-social-service
+    environment:
+      NODE_ENV: development
+      SOCIAL_SERVICE_PORT: 3006
+      SERVICE_NAME: social-service
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: adventure_user
+      POSTGRES_PASSWORD: adventure_pass
+      POSTGRES_DB: adventure_platform
+      POSTGRES_SSL: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 4
+      JWT_ACCESS_SECRET: dev-access-secret-change-in-production
+      AUTH_SERVICE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3003
+      QUEST_SERVICE_URL: http://quest-service:3004
+      GAMIFICATION_SERVICE_URL: http://gamification-service:3005
+      # Friend System Configuration
+      MAX_FRIENDS: 500
+      MAX_PENDING_REQUESTS: 50
+      FRIEND_REQUEST_EXPIRY_DAYS: 30
+      # Feed Configuration
+      DEFAULT_FEED_LIMIT: 20
+      MAX_FEED_LIMIT: 100
+      FEED_CACHE_TTL: 60
+      TRENDING_HOURS: 24
+      # Interaction Configuration
+      ENABLE_NESTED_COMMENTS: "true"
+      MAX_COMMENT_DEPTH: 3
+      MAX_COMMENT_LENGTH: 2000
+      LIKE_RATE_LIMIT: 100
+      COMMENT_RATE_LIMIT: 50
+      # Follow Configuration
+      MAX_FOLLOWING: 1000
+      ENABLE_FOLLOW_NOTIFICATIONS: "true"
+      # Logging
+      LOG_LEVEL: info
+    ports:
+      - "3006:3006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      quest-service:
+        condition: service_healthy
+      gamification-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3006/api/social/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
