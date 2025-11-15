@@ -1,0 +1,205 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [main, develop, 'claude/**']
+    paths:
+      - 'services/**'
+      - '.github/workflows/backend-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/**'
+
+jobs:
+  test-auth-service:
+    name: Test Auth Service
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: auth_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: services/auth-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: services/auth-service
+        run: npm ci
+
+      - name: Run migrations
+        working-directory: services/auth-service
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/auth_test
+        run: npm run migrate
+
+      - name: Run tests
+        working-directory: services/auth-service
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/auth_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret-key
+        run: npm test -- --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./services/auth-service/coverage/lcov.info
+          flags: auth-service
+
+  test-quest-service:
+    name: Test Quest Service
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: quest_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: services/quest-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: services/quest-service
+        run: npm ci
+
+      - name: Run migrations
+        working-directory: services/quest-service
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/quest_test
+        run: npm run migrate
+
+      - name: Run tests
+        working-directory: services/quest-service
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/quest_test
+        run: npm test -- --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./services/quest-service/coverage/lcov.info
+          flags: quest-service
+
+  test-admin-service:
+    name: Test Admin Service
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: admin_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: services/admin-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: services/admin-service
+        run: npm ci
+
+      - name: Run tests
+        working-directory: services/admin-service
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/admin_test
+        run: npm test -- --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./services/admin-service/coverage/lcov.info
+          flags: admin-service
+
+  lint:
+    name: Lint Backend Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Lint Auth Service
+        working-directory: services/auth-service
+        run: |
+          npm ci
+          npm run lint
+
+      - name: Lint Quest Service
+        working-directory: services/quest-service
+        run: |
+          npm ci
+          npm run lint
+
+      - name: Lint Admin Service
+        working-directory: services/admin-service
+        run: |
+          npm ci
+          npm run lint

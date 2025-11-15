@@ -1,0 +1,233 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, develop]
+
+jobs:
+  pr-metadata:
+    name: PR Metadata Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            chore
+            ci
+          requireScope: false
+
+      - name: Check PR size
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const additions = pr.additions;
+            const deletions = pr.deletions;
+            const total = additions + deletions;
+
+            if (total > 1000) {
+              core.warning(`This PR is quite large (${total} lines changed). Consider breaking it into smaller PRs.`);
+            }
+
+  changed-files:
+    name: Detect Changed Files
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+      docs: ${{ steps.filter.outputs.docs }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'services/**'
+            frontend:
+              - 'frontend/**'
+              - 'admin-dashboard/**'
+            mobile:
+              - 'mobile/**'
+            docs:
+              - 'docs/**'
+              - '**.md'
+
+  run-backend-tests:
+    name: Run Backend Tests
+    needs: changed-files
+    if: needs.changed-files.outputs.backend == 'true'
+    uses: ./.github/workflows/backend-tests.yml
+
+  run-frontend-tests:
+    name: Run Frontend Tests
+    needs: changed-files
+    if: needs.changed-files.outputs.frontend == 'true'
+    uses: ./.github/workflows/frontend-tests.yml
+
+  run-mobile-tests:
+    name: Run Mobile Tests
+    needs: changed-files
+    if: needs.changed-files.outputs.mobile == 'true'
+    uses: ./.github/workflows/mobile-ci.yml
+
+  code-review:
+    name: Automated Code Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run code review bot
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+
+            let issues = [];
+
+            for (const file of files) {
+              // Check for console.log in production code
+              if (file.filename.match(/\.(ts|tsx|js|jsx)$/) && file.patch) {
+                if (file.patch.includes('console.log') && !file.filename.includes('test')) {
+                  issues.push(`⚠️ Found console.log in ${file.filename}`);
+                }
+              }
+
+              // Check for large files
+              if (file.additions > 500) {
+                issues.push(`📊 Large file detected: ${file.filename} (${file.additions} additions)`);
+              }
+
+              // Check for missing tests
+              if (file.filename.includes('/src/') &&
+                  !file.filename.includes('.test.') &&
+                  !file.filename.includes('.spec.')) {
+                const testFile = file.filename.replace(/\.(ts|tsx|js|jsx)$/, '.test.$1');
+                const hasTest = files.some(f => f.filename === testFile);
+                if (!hasTest) {
+                  issues.push(`🧪 No test file found for ${file.filename}`);
+                }
+              }
+            }
+
+            if (issues.length > 0) {
+              const comment = `## Automated Code Review\n\n${issues.join('\n')}`;
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: comment,
+              });
+            }
+
+  label-pr:
+    name: Auto-label PR
+    runs-on: ubuntu-latest
+    needs: changed-files
+
+    steps:
+      - uses: actions/labeler@v4
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add size label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const total = pr.additions + pr.deletions;
+
+            let sizeLabel = 'size/XS';
+            if (total > 10) sizeLabel = 'size/S';
+            if (total > 50) sizeLabel = 'size/M';
+            if (total > 200) sizeLabel = 'size/L';
+            if (total > 500) sizeLabel = 'size/XL';
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: [sizeLabel]
+            });
+
+      - name: Add component labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [];
+
+            if ('${{ needs.changed-files.outputs.backend }}' === 'true') labels.push('backend');
+            if ('${{ needs.changed-files.outputs.frontend }}' === 'true') labels.push('frontend');
+            if ('${{ needs.changed-files.outputs.mobile }}' === 'true') labels.push('mobile');
+            if ('${{ needs.changed-files.outputs.docs }}' === 'true') labels.push('documentation');
+
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: labels
+              });
+            }
+
+  pr-summary:
+    name: PR Summary
+    runs-on: ubuntu-latest
+    needs: [changed-files, pr-metadata]
+
+    steps:
+      - name: Post PR summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const summary = `
+            ## PR Summary
+
+            📊 **Changes:**
+            - Lines added: ${pr.additions}
+            - Lines deleted: ${pr.deletions}
+            - Files changed: ${pr.changed_files}
+
+            🔍 **Components affected:**
+            ${pr.changed_files > 0 ? '- Backend: ' + ('${{ needs.changed-files.outputs.backend }}' === 'true' ? '✅' : '❌') : ''}
+            ${pr.changed_files > 0 ? '- Frontend: ' + ('${{ needs.changed-files.outputs.frontend }}' === 'true' ? '✅' : '❌') : ''}
+            ${pr.changed_files > 0 ? '- Mobile: ' + ('${{ needs.changed-files.outputs.mobile }}' === 'true' ? '✅' : '❌') : ''}
+            ${pr.changed_files > 0 ? '- Docs: ' + ('${{ needs.changed-files.outputs.docs }}' === 'true' ? '✅' : '❌') : ''}
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: summary
+            });

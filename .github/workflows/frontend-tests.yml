@@ -1,0 +1,125 @@
+name: Frontend Tests
+
+on:
+  push:
+    branches: [main, develop, 'claude/**']
+    paths:
+      - 'frontend/**'
+      - 'admin-dashboard/**'
+      - '.github/workflows/frontend-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - 'admin-dashboard/**'
+
+jobs:
+  test-web-frontend:
+    name: Test Web Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm test -- --coverage --watchAll=false
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./frontend/coverage/lcov.info
+          flags: web-frontend
+
+  test-admin-dashboard:
+    name: Test Admin Dashboard
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: admin-dashboard/package-lock.json
+
+      - name: Install dependencies
+        working-directory: admin-dashboard
+        run: npm ci
+
+      - name: Run linter
+        working-directory: admin-dashboard
+        run: npm run lint || true
+
+      - name: Build
+        working-directory: admin-dashboard
+        run: npm run build
+
+  lint-frontend:
+    name: Lint Frontend Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Lint Web Frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+
+      - name: Check TypeScript
+        working-directory: frontend
+        run: |
+          npm run type-check || true
+
+  build-frontends:
+    name: Build All Frontends
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        app: [frontend, admin-dashboard]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.app }}
+        run: npm ci
+
+      - name: Build
+        working-directory: ${{ matrix.app }}
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.app }}-build
+          path: ${{ matrix.app }}/dist
+          retention-days: 7

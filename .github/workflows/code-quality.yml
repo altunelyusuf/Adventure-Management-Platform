@@ -1,0 +1,179 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, develop, 'claude/**']
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  eslint:
+    name: ESLint
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        project:
+          - path: frontend
+            name: Web Frontend
+          - path: admin-dashboard
+            name: Admin Dashboard
+          - path: services/auth-service
+            name: Auth Service
+          - path: services/quest-service
+            name: Quest Service
+          - path: services/admin-service
+            name: Admin Service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.project.path }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.project.path }}
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: ${{ matrix.project.path }}
+        run: npm run lint || true
+        continue-on-error: true
+
+  typescript:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        project:
+          - frontend
+          - admin-dashboard
+          - services/auth-service
+          - services/quest-service
+          - services/admin-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.project }}
+        run: npm ci
+
+      - name: Type check
+        working-directory: ${{ matrix.project }}
+        run: npx tsc --noEmit || true
+        continue-on-error: true
+
+  prettier:
+    name: Prettier Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Prettier
+        run: npm install -g prettier
+
+      - name: Check formatting
+        run: |
+          prettier --check "**/*.{ts,tsx,js,jsx,json,md,yml,yaml}" \
+            --ignore-path .gitignore || true
+        continue-on-error: true
+
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        project:
+          - frontend
+          - admin-dashboard
+          - services/auth-service
+          - services/quest-service
+          - services/admin-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run npm audit
+        working-directory: ${{ matrix.project }}
+        run: npm audit --audit-level=high || true
+        continue-on-error: true
+
+  codeql:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      matrix:
+        language: [javascript, typescript]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+  complexity:
+    name: Code Complexity Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install complexity tool
+        run: npm install -g complexity-report
+
+      - name: Analyze complexity
+        run: |
+          find services -name "*.ts" -not -path "*/node_modules/*" | \
+            xargs cr --format json > complexity-report.json || true
+        continue-on-error: true
+
+      - name: Upload complexity report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: complexity-report
+          path: complexity-report.json
+          retention-days: 30
